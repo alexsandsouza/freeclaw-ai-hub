@@ -44,7 +44,8 @@ class FreeClawApp(tk.Tk):
         self.task=scrolledtext.ScrolledText(page,height=4,font=("Consolas",10))
         self.task.insert("1.0",TASK);self.task.pack(fill="x")
         buttons=ttk.Frame(page);buttons.pack(fill="x",pady=12)
-        ttk.Button(buttons,text="Pré-validar sem gastar tokens",command=self.preview).pack(side="left")
+        ttk.Button(buttons,text="Preparar pedido de arquivos",command=self.prepare_code_request).pack(side="left")
+        ttk.Button(buttons,text="Pré-validar sem gastar tokens",command=self.preview).pack(side="left",padx=6)
         self.send_button=ttk.Button(buttons,text="Enviar à NVIDIA (confirmar)",command=self.submit)
         self.send_button.pack(side="left",padx=9)
         ttk.Button(buttons,text="Salvar resposta .md",command=self.save).pack(side="left")
@@ -119,6 +120,23 @@ class FreeClawApp(tk.Tk):
         if filename:
             Path(filename).write_text(self.response,encoding="utf-8")
             self.status.set("Rascunho salvo localmente, aguardando revisão.")
+
+    def prepare_code_request(self):
+        request = (
+            "Com base nos artefatos SPECTION, proponha somente os arquivos do primeiro "
+            "incremento POST /students para revisão humana. Não suponha aprovação, "
+            "não execute comandos nem afirme testes executados. Para CADA arquivo "
+            "use exatamente um cabeçalho '### Arquivo: src/nome.py' ou "
+            "'### Arquivo: tests/test_nome.py', seguido por um bloco Markdown "
+            "com três crases e linguagem python. Produza caminhos relativos "
+            "somente sob src/ e tests/, sem dependências instaladas automaticamente. "
+            "Inclua ao final uma tabela RF → AC → arquivos → testes propostos "
+            "e liste decisões pendentes. Se os requisitos não sustentarem a "
+            "implementação, explique as lacunas e não gere código ficticiamente aprovado."
+        )
+        self.task.delete("1.0","end")
+        self.task.insert("1.0", request)
+        self.status.set("Pedido estruturado preparado. Revise antes de enviar à NVIDIA.")
 
     def review_proposal(self):
         """Review a saved Markdown response or the current model answer. Never execute it."""
