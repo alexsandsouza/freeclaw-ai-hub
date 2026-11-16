@@ -6,7 +6,7 @@
 
 ## Status
 
-The repository now contains the **public website and functional FreeClaw AI Studio 0.2 browser workspace**. The Studio can create local projects, edit SPECTION documents, manage tasks and export Markdown/JSON backups. It does **not** execute agents, run code, call AI APIs or host Python. The experimental Python bridge continues to live separately in the SPECTION repository.\n\n[Open AI Studio 0.2](https://alexsandsouza.github.io/freeclaw-ai-hub/studio.html)
+The repository now contains the **public website and functional FreeClaw AI Studio 0.3 browser workspace**. The Studio can create local projects, edit SPECTION documents, manage tasks, perform limited static checks (placeholders, identifiers, review status), export review prompts and Markdown/JSON backups. It does **not** execute agents, run code, call AI APIs or host Python. The experimental Python bridge continues to live separately in the SPECTION repository.\n\n[Open AI Studio 0.3](https://alexsandsouza.github.io/freeclaw-ai-hub/studio.html)
 
 ## Deploy to GitHub Pages
 
@@ -29,8 +29,9 @@ Studio saves drafts in localStorage on the current browser profile. This is not 
 - [x] GitHub Pages deployment workflow
 - [x] Browser-based projects, SPECTION editor, task checklist and backup export (local-only MVP)\n- [ ] Connect Studio to an authenticated local engine
 - [ ] Optional gateway integration and free-only policy
-- [ ] AI-assisted code drafting with review gates
+- [x] Static SPECTION validation and review prompt export (no AI execution)\n- [ ] AI-assisted code drafting with authenticated local integration and review gates
 - [ ] Test execution and traceability panel
 
 License selection and attribution review are pending. External dependencies retain their own licenses.
-\n## Studio 0.2 user guide\n\n1. Open [the graphical Studio](https://alexsandsouza.github.io/freeclaw-ai-hub/studio.html).\n2. Create a named project and provide a short goal.\n3. Open **Especificações** to edit Product Brief, PRD, HLD, LLD and Feature Specification.\n4. Track tasks in **Tarefas**.\n5. Export a combined Markdown document or an individual specification; use **Exportar backup JSON** for an importable complete backup.\n6. Review documents before transferring them into a real SPECTION Kit project.\n\n**Important:** The combined Markdown export is a readable bundle, not an automatically installed project tree. No APIs are called and the browser cannot control the existing local Python server.\n
+\n## Studio 0.3 user guide\n\n1. Open [the graphical Studio](https://alexsandsouza.github.io/freeclaw-ai-hub/studio.html).\n2. Create a named project and provide a short goal.\n3. Open **Especificações** to edit Product Brief, PRD, HLD, LLD and Feature Specification.\n4. Track tasks in **Tarefas**.\n5. Export a combined Markdown document or an individual specification; use **Exportar backup JSON** for an importable complete backup.\n6. Review documents before transferring them into a real SPECTION Kit project.\n\n**Important:** The combined Markdown export is a readable bundle, not an automatically installed project tree. No APIs are called and the browser cannot control the existing local Python server.\n
+## Studio 0.3 audit and AI Developer\n\nOpen **Validador** to run text-based checks for missing content, placeholders, identifiers and pending decisions. These checks are heuristics, not semantic verification or a passing test suite. Open **AI Developer** to generate a Markdown prompt package for offline review and optional separate execution with the SPECTION FreeClaw Python Bridge. The website does not transmit data to AI APIs and never asks for API keys.\n\nDo not upload real student data, confidential specifications or secrets to the public browser UI. The browser saves unencrypted drafts on the device only.\n
