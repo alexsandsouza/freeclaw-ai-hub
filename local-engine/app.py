@@ -1,9 +1,10 @@
-"""FreeClaw Local Engine v0.4 - secure, review-first Tkinter desktop UI."""
+"""FreeClaw Local Engine v0.5 - secure, review-first Tkinter desktop UI."""
 import queue
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
+from proposal_parser import extract_files, build_zip
 
 from engine import call_nvidia, load_specification, make_messages
 
@@ -13,7 +14,7 @@ TASK = ("Proponha o incremento POST /students em FastAPI e SQLite, validação e
 class FreeClawApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("FreeClaw Local Engine 0.4 - SPECTION")
+        self.title("FreeClaw Local Engine 0.5 - SPECTION")
         self.geometry("940x740")
         self.minsize(670,560)
         self.file = None
@@ -43,10 +44,12 @@ class FreeClawApp(tk.Tk):
         self.task=scrolledtext.ScrolledText(page,height=4,font=("Consolas",10))
         self.task.insert("1.0",TASK);self.task.pack(fill="x")
         buttons=ttk.Frame(page);buttons.pack(fill="x",pady=12)
-        ttk.Button(buttons,text="Pré-validar sem gastar tokens",command=self.preview).pack(side="left")
+        ttk.Button(buttons,text="Preparar pedido de arquivos",command=self.prepare_code_request).pack(side="left")
+        ttk.Button(buttons,text="Pré-validar sem gastar tokens",command=self.preview).pack(side="left",padx=6)
         self.send_button=ttk.Button(buttons,text="Enviar à NVIDIA (confirmar)",command=self.submit)
         self.send_button.pack(side="left",padx=9)
         ttk.Button(buttons,text="Salvar resposta .md",command=self.save).pack(side="left")
+        ttk.Button(buttons,text="Revisar arquivos Python",command=self.review_proposal).pack(side="left",padx=9)
         ttk.Label(page,textvariable=self.status,wraplength=800).pack(anchor="w",pady=(0,9))
         self.output=scrolledtext.ScrolledText(page,font=("Consolas",10),wrap="word")
         self.output.pack(fill="both",expand=True)
@@ -117,6 +120,89 @@ class FreeClawApp(tk.Tk):
         if filename:
             Path(filename).write_text(self.response,encoding="utf-8")
             self.status.set("Rascunho salvo localmente, aguardando revisão.")
+
+    def prepare_code_request(self):
+        request = (
+            "Com base nos artefatos SPECTION, proponha somente os arquivos do primeiro "
+            "incremento POST /students para revisão humana. Não suponha aprovação, "
+            "não execute comandos nem afirme testes executados. Para CADA arquivo "
+            "use exatamente um cabeçalho '### Arquivo: src/nome.py' ou "
+            "'### Arquivo: tests/test_nome.py', seguido por um bloco Markdown "
+            "com três crases e linguagem python. Produza caminhos relativos "
+            "somente sob src/ e tests/, sem dependências instaladas automaticamente. "
+            "Inclua ao final uma tabela RF → AC → arquivos → testes propostos "
+            "e liste decisões pendentes. Se os requisitos não sustentarem a "
+            "implementação, explique as lacunas e não gere código ficticiamente aprovado."
+        )
+        self.task.delete("1.0","end")
+        self.task.insert("1.0", request)
+        self.status.set("Pedido estruturado preparado. Revise antes de enviar à NVIDIA.")
+
+    def review_proposal(self):
+        """Review a saved Markdown response or the current model answer. Never execute it."""
+        if self.response.strip():
+            if messagebox.askyesno("Fonte da proposta","Usar a resposta atual da NVIDIA? Clique em Não para escolher um arquivo .md já salvo."):
+                raw = self.response
+            else:
+                raw = self.load_proposal()
+        else:
+            raw = self.load_proposal()
+        if raw is None:
+            return
+        try:
+            files = extract_files(raw)
+        except (ValueError, UnicodeError) as exc:
+            messagebox.showwarning("Formato de código", str(exc))
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("Revisão de arquivos - nenhuma execução")
+        popup.geometry("860x650")
+        popup.transient(self)
+        frame = ttk.Frame(popup, padding=12)
+        frame.pack(fill="both", expand=True)
+        ttk.Label(frame,text=f"{len(files)} arquivo(s) proposto(s). Revisão humana obrigatória; não serão escritos no projeto.").pack(anchor="w")
+        picker = ttk.Combobox(frame, state="readonly", values=list(files))
+        picker.pack(fill="x", pady=(12,8))
+        view = scrolledtext.ScrolledText(frame, font=("Consolas",10), wrap="none")
+        view.pack(fill="both", expand=True)
+        def show(_event=None):
+            view.delete("1.0","end")
+            view.insert("1.0", files[picker.get()])
+            view.configure(state="disabled")
+        def select(_event=None):
+            view.configure(state="normal")
+            show()
+        picker.bind("<<ComboboxSelected>>", select)
+        picker.current(0)
+        select()
+        def export():
+            if not messagebox.askyesno("Exportar para revisão","Gerar ZIP isolado? Os arquivos não serão executados nem copiados automaticamente para seu projeto."):
+                return
+            target = filedialog.asksaveasfilename(parent=popup,defaultextension=".zip",filetypes=[("Arquivo ZIP","*.zip")],initialfile="freeclaw-proposta-revisao.zip")
+            if not target:
+                return
+            try:
+                data = build_zip(files)
+                Path(target).write_bytes(data)
+            except (ValueError,OSError) as exc:
+                messagebox.showerror("Erro ao exportar",str(exc),parent=popup)
+                return
+            messagebox.showinfo("Exportado","ZIP salvo para revisão. Não execute o código sem inspecioná-lo.",parent=popup)
+        ttk.Button(frame,text="Exportar ZIP revisável (não executa)",command=export).pack(anchor="e",pady=10)
+
+    def load_proposal(self):
+        source = filedialog.askopenfilename(filetypes=[("Proposta Markdown","*.md")])
+        if not source:
+            return None
+        try:
+            path = Path(source)
+            if path.stat().st_size > 250_000:
+                raise ValueError("Proposta excede 250 KB.")
+            return path.read_text(encoding="utf-8-sig")
+        except (OSError,ValueError,UnicodeError) as exc:
+            messagebox.showerror("Leitura",str(exc))
+            return None
 
     def close(self):
         self.key.set("")
