@@ -1,4 +1,4 @@
-# FreeClaw Local Engine 0.4
+# FreeClaw Local Engine 0.5
 
 Aplicativo gráfico em Python/Tkinter para Windows. Não é hospedado no GitHub Pages.
 
@@ -24,3 +24,20 @@ Aplicativo gráfico em Python/Tkinter para Windows. Não é hospedado no GitHub 
 ## Testes
 
 Na raiz do repositório: `python -m unittest discover -s tests -p 'test_local_engine.py'`.
+
+## 0.5 - Gerador de projetos para revisão
+
+1. Abra o aplicativo e selecione o pacote SPECTION exportado do AI Studio.
+2. Clique em **Preparar pedido de arquivos** para solicitar à NVIDIA blocos nomeados `### Arquivo: src/arquivo.py` seguidos por código `python` cercado por três crases.
+3. Revise e autorize **Enviar à NVIDIA**. Esta operação utiliza cota do seu provedor.
+4. Quando houver uma proposta, clique em **Revisar arquivos Python**, escolha um arquivo e leia o código integral.
+5. Clique em **Exportar ZIP revisável (não executa)**. O ZIP inclui `REVIEW_REQUIRED.md` e os arquivos `src/*.py` e `tests/*.py` propostos.
+
+O gerador recusa caminhos absolutos, traversal com `..`, extensões não Python, duplicidades, blocos incompletos e alguns padrões de segredo. Esses controles não tornam o código da IA seguro para executar. Não extrai nem escreve arquivos dentro do projeto automaticamente, não executa scripts, não instala dependências e não faz push ao GitHub.
+
+Se a NVIDIA responder apenas com um plano descritivo, o botão avisará que não encontrou blocos de arquivos. Isso é esperado e não deve ser tratado como implementação concluída.
+
+## Próximos marcos
+- Comparação de diferenças com arquivos existentes antes de aceitar alterações
+- Execução de testes em sandbox após autorização explícita
+- Integração autenticada do frontend com serviço local, sem expor a chave no GitHub Pages
