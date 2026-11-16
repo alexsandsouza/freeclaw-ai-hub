@@ -1,10 +1,11 @@
-"""FreeClaw Local Engine v0.5 - secure, review-first Tkinter desktop UI."""
+"""FreeClaw Local Engine v0.6 - secure, review-first Tkinter desktop UI."""
 import queue
 import threading
 import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, messagebox, scrolledtext, ttk
 from proposal_parser import extract_files, build_zip
+from review_workspace import compare_files, export_selected, read_proposal_zip
 
 from engine import call_nvidia, load_specification, make_messages
 
@@ -14,7 +15,7 @@ TASK = ("Proponha o incremento POST /students em FastAPI e SQLite, validação e
 class FreeClawApp(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("FreeClaw Local Engine 0.5 - SPECTION")
+        self.title("FreeClaw Local Engine 0.6 - SPECTION")
         self.geometry("940x740")
         self.minsize(670,560)
         self.file = None
@@ -50,6 +51,7 @@ class FreeClawApp(tk.Tk):
         self.send_button.pack(side="left",padx=9)
         ttk.Button(buttons,text="Salvar resposta .md",command=self.save).pack(side="left")
         ttk.Button(buttons,text="Revisar arquivos Python",command=self.review_proposal).pack(side="left",padx=9)
+        ttk.Button(buttons,text="Comparar / aprovar arquivos",command=self.compare_workspace).pack(side="left",padx=5)
         ttk.Label(page,textvariable=self.status,wraplength=800).pack(anchor="w",pady=(0,9))
         self.output=scrolledtext.ScrolledText(page,font=("Consolas",10),wrap="word")
         self.output.pack(fill="both",expand=True)
@@ -203,6 +205,93 @@ class FreeClawApp(tk.Tk):
         except (OSError,ValueError,UnicodeError) as exc:
             messagebox.showerror("Leitura",str(exc))
             return None
+
+    def compare_workspace(self):
+        """Explicit review: compare only; never write into the chosen project."""
+        path = filedialog.askopenfilename(
+            title="Selecione o ZIP de código para revisão",
+            filetypes=[("ZIP de revisão", "*.zip")])
+        if not path:
+            return
+        root = filedialog.askdirectory(title="Selecione a pasta raiz do projeto existente")
+        if not root:
+            return
+        try:
+            selected_zip = Path(path)
+            if selected_zip.stat().st_size > 2_000_000:
+                raise ValueError("ZIP de proposta muito grande.")
+            files = read_proposal_zip(selected_zip.read_bytes())
+            comparison = compare_files(Path(root), files)
+        except (ValueError, OSError, UnicodeError, __import__("zipfile").BadZipFile) as exc:
+            messagebox.showerror("Falha na revisão", str(exc))
+            return
+
+        popup = tk.Toplevel(self)
+        popup.title("FreeClaw 0.6 - comparação somente leitura")
+        popup.geometry("930x720")
+        popup.transient(self)
+        wrapper = ttk.Frame(popup, padding=12)
+        wrapper.pack(fill="both", expand=True)
+        ttk.Label(
+            wrapper, text="Compare as diferenças e marque cada arquivo aprovado para exportação. "
+                          "NADA será escrito no projeto.",
+            wraplength=850).pack(anchor="w")
+        lines = ttk.Frame(wrapper)
+        lines.pack(fill="x", pady=(12,8))
+        selection = {}
+        for index, name in enumerate(files):
+            var = tk.BooleanVar(value=False)
+            selection[name] = var
+            ttk.Checkbutton(
+                lines,
+                text=name + " [" + comparison[name]["status"] + "]",
+                variable=var).grid(row=index//2, column=index%2, sticky="w", padx=(0,20), pady=2)
+        picker = ttk.Combobox(wrapper, state="readonly", values=list(files))
+        picker.pack(fill="x", pady=6)
+        diffview = scrolledtext.ScrolledText(wrapper, font=("Consolas",10), wrap="none")
+        diffview.pack(fill="both", expand=True)
+        def onpick(_event=None):
+            name = picker.get()
+            diffview.configure(state="normal")
+            diffview.delete("1.0","end")
+            diffview.insert("1.0", comparison[name]["diff"])
+            diffview.configure(state="disabled")
+        picker.bind("<<ComboboxSelected>>", onpick)
+        picker.current(0)
+        onpick()
+
+        def export_review():
+            approved = [name for name,var in selection.items() if var.get()]
+            if not approved:
+                messagebox.showwarning("Seleção","Marque ao menos um arquivo revisado.",parent=popup)
+                return
+            if not messagebox.askyesno(
+                "Confirmar exportação",
+                f"Exportar {len(approved)} arquivo(s) para um ZIP separado? "
+                "O projeto existente NÃO será alterado.",
+                parent=popup):
+                return
+            dest = filedialog.asksaveasfilename(
+                parent=popup, defaultextension=".zip",
+                filetypes=[("ZIP", "*.zip")],
+                initialfile="freeclaw-arquivos-aprovados-para-revisao.zip")
+            if not dest:
+                return
+            try:
+                data = export_selected(files, approved)
+                Path(dest).write_bytes(data)
+            except (OSError, ValueError) as exc:
+                messagebox.showerror("Exportação",str(exc),parent=popup)
+                return
+            messagebox.showinfo(
+                "Exportação concluída",
+                "Arquivos selecionados exportados para ZIP. Isso NÃO significa "
+                "que foram executados, testados ou aprovados para produção.",
+                parent=popup)
+        ttk.Button(
+            wrapper,
+            text="Exportar somente arquivos selecionados (sem aplicar)",
+            command=export_review).pack(anchor="e",pady=10)
 
     def close(self):
         self.key.set("")
